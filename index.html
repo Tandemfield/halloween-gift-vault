@@ -332,7 +332,7 @@ async function createShortLink(){
     });
     const res=await fetch(API+'/api/gifts',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain'},
       body:JSON.stringify(gift)
     });
     const data=await res.json();
