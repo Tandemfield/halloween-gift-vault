@@ -226,6 +226,7 @@ body:has(.em):has(.opt) h2::after,body:has(.msg):not(:has(h1)) .msg::after,body:
 (()=>{
 "use strict";
 const $=s=>document.querySelector(s);
+const API='https://halloween-gift-links.tandemfieldstudio.workers.dev';
 const E=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS={g(k){try{return localStorage.getItem(k)}catch(e){return null}},s(k,v){try{localStorage.setItem(k,v)}catch(e){}},d(k){try{localStorage.removeItem(k)}catch(e){}}};
 const SEAL='<svg viewBox="0 0 120 120" aria-hidden="true"><defs><radialGradient id="wg" cx="40%" cy="35%"><stop offset="0" stop-color="#a24560"/><stop offset="1" stop-color="#4a1a29"/></radialGradient></defs><circle cx="60" cy="60" r="54" fill="url(#wg)"/><circle cx="60" cy="60" r="54" fill="none" stroke="#6b2d3e" stroke-width="7" stroke-dasharray="15 5 9 6 12 4"/><circle cx="60" cy="60" r="36" fill="none" stroke="#e7b59a" stroke-opacity=".35" stroke-width="2"/><path d="M60 34c9 11 15 17 15 28a15 15 0 0 1-30 0c0-7 3-10 7-14 1 5 4 8 6 8-2-9-1-15 2-22z" fill="#f3d9c4" fill-opacity=".9"/></svg>';
@@ -316,7 +317,34 @@ const HT=['','Pick one for each side. A group is just one name, like The Girls.'
 let D={},bs=0,sm=-1;
 try{const x=JSON.parse(LS.g('tf_boo_draft')||'null');if(x){D=clean(x);['a','b'].forEach(k=>{if(D[k]!=='g')D[k]=''})}KEYS.forEach(k=>{if(!D[k])delete D[k]})}catch(e){D={}}
 const saveD=()=>LS.s('tf_boo_draft',JSON.stringify(D));
-const mk=()=>{if(!HOK)return '';const o={};KEYS.forEach(k=>{const v=(D[k]||'').trim();if(v)o[k]=v});return location.href.split('#')[0]+'#p='+enc(o)};
+let shortLink='',linkBusy=false,linkError='';
+async function createShortLink(){
+  if(linkBusy)return;
+  if(shortLink)return;
+  linkBusy=true;
+  linkError='';
+  renderB();
+  try{
+    const gift={};
+    KEYS.forEach(k=>{
+      const v=(D[k]||'').trim();
+      if(v)gift[k]=v;
+    });
+    const res=await fetch(API+'/api/gifts',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(gift)
+    });
+    const data=await res.json();
+    if(!res.ok||!data.url)throw new Error(data.error||'Could not create your link.');
+    shortLink=data.url;
+  }catch(e){
+    linkError='Your short link could not be created. Check your connection and try again.';
+  }finally{
+    linkBusy=false;
+    renderB();
+  }
+}
 const nl=k=>{if(k!='n'&&k!='f')return DEF[k]?[LAB[k][0],dflt(k,D)]:LAB[k];const g=k=='f'?D.a=='g':D.b=='g',gr=D.a=='g'&&D.b=='g';return k=='f'?(g?[gr?'Your group name':'Group name','e.g. The Girls']:['Your name','e.g. Maya']):(g?[gr?'Their group name':'Group name','e.g. The Boys']:['Their name','e.g. Jordan'])};
 const seg=()=>[['Who is it from?','a',['Just me','A group']],['Who is it for?','b',['One person','A group']]].map(q=>'<div class="fd"><label id="l_'+q[1]+'">'+q[0]+'</label><div class="row" role="group" aria-labelledby="l_'+q[1]+'">'+q[2].map((t,i)=>{const on=(D[q[1]]=='g')==(i==1);return '<button class="opt sg'+(on?' ok':'')+'" data-b="mode" data-k="'+q[1]+'" data-v="'+(i?'g':'')+'" aria-pressed="'+on+'">'+t+'</button>'}).join('')+'</div></div>').join('');
 const fld=k=>{const L=nl(k),v=D[k]||'',st=k=='m'||DEF[k];return '<div class="fd"><label for="f_'+k+'">'+L[0]+'</label>'+(ML[k]?'<textarea id="f_'+k+'" data-k="'+k+'" maxlength="'+MAXL[k]+'" rows="4" placeholder="'+E(L[1])+'">'+E(v)+'</textarea>':'<input id="f_'+k+'" data-k="'+k+'" maxlength="'+MAXL[k]+'" placeholder="'+E(L[1])+'" value="'+E(v)+'" autocomplete="off">')+'<div class="rw"><span class="ct" id="c_'+k+'">'+v.length+'/'+MAXL[k]+'</span>'+(st?'<button class="lnk" data-b="st" data-k="'+k+'">Use a starter</button>':'')+'</div></div>'};
@@ -327,23 +355,60 @@ if(bs==0)body='<svg class="hero" viewBox="0 0 360 220" role="img" aria-label="A 
 else if(STEPS[bs])body='<h2>'+TT[bs]+'</h2><p class="mut">'+HT[bs]+'</p>'+(bs==1?seg():'')+STEPS[bs].map(fld).join('');
 else if(bs==6)body='<h2>Preview</h2><p class="mut">See it exactly as they will. Nothing is sent.</p><button class="btn" data-b="prev">Preview the experience</button><p class="mut">Tap through every screen. It takes about three minutes.</p>';
 else if(!HOK){body='<div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="#e0975a" stroke-width="1.7" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></div><h2 style="text-align:center">Link not created</h2><div class="note">You opened this builder from a file on your phone (a <b>file://</b> or <b>content://</b> address), so a recipient link would only work on this device. Open the builder from your hosted <b>https://</b> website address and come back to this step. Drafts are stored separately for each address, so you will need to re-enter your details there. Preview still works here.</div>'}
-else{const l=mk();body='<div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="#e0975a" stroke-width="1.7" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></div><h2 style="text-align:center">Your gift is ready</h2><p class="mut" style="text-align:center">Send this link. The gift is inside the link itself, so it does not expire.</p><label for="lk">Link</label><textarea id="lk" readonly rows="4">'+E(l)+'</textarea><div class="row"><button class="btn" data-b="copy">Copy link</button>'+(navigator.share?'<button class="btn g" data-b="share">Share</button>':'')+'</div><div class="row"><a class="btn g" href="'+E(l)+'" target="_blank" rel="noopener">Open it like they will</a></div>'+(HOK?'':'<div class="note"><b>Heads up:</b> you opened this builder from a file on your phone, so this link only works on this device. Open the builder from your hosted website address, then create the link again.</div>')+(l.length>3500?'<div class="note">This link is long. If a chat app cuts it off, shorten a message or two.</div>':'')+'<div class="note"><b>About this link:</b> your names and messages are packed inside the link itself. This page stores nothing on a server. Anyone who has the link can read what is inside, so send it only to them. It is not encrypted. Save the link: this page cannot recover it later.</div><div class="note">Tips: open the link yourself first. Text it with "Open this on your phone 👻". Send it the moment you hand over the basket, lights low.</div>'}
+else{
+ const l=shortLink;
+ body='<div class="ring"></div><h2 style="text-align:center">Your gift is ready</h2>';
+ if(linkBusy){
+  body+='<p class="mut">Creating your short gift link. Please wait...</p>';
+ }else if(linkError){
+  body+='<p class="mut">'+E(linkError)+'</p><button class="btn" data-b="retry">Try again</button>';
+ }else if(l){
+  body+='<p class="mut">Your gift link is ready. It expires after 180 days.</p><label for="lk">Short gift link</label><textarea id="lk" readonly rows="3">'+E(l)+'</textarea><div class="row"><button class="btn" data-b="copy">Copy link</button>'+(navigator.share?'<button class="btn g" data-b="share">Share</button>':'')+'</div><div class="row"><a class="btn g" href="'+E(l)+'" target="_blank" rel="noopener">Open it like they will</a></div><div class="note">Anyone with this link can read your gift details. Do not share it publicly.</div><div class="note">Save your link somewhere safe. Your gift details are stored by our link service for up to 180 days.</div>';
+ }else{
+  body+='<p class="mut">Preparing your link...</p>';
+ }
+}
 $('#b').innerHTML='<div class="bar bh"><span class="br2"><b>T</b>Tandemfield</span><span>Step '+(bs+1)+' of 8</span></div><div class="pg"><i style="width:'+((bs+1)/8*100)+'%"></i></div><main class="sc bm"><div class="in">'+body+'</div></main><div class="ft">'+(bs?'<button class="btn g" data-b="bk">Back</button>':'')+(bs<7?'<button class="btn" id="bn" data-b="nx">'+(bs?'Next':'Start')+'</button>':'')+'</div>';
 chk();$('#b .sc').scrollTop=0}
 $('#b').addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;D[k]=e.target.value;const c=$('#c_'+k);if(c)c.textContent=D[k].length+'/'+MAXL[k];saveD();chk()});
 $('#b').addEventListener('click',e=>{const t=e.target.closest('[data-b]');if(!t)return;const a=t.dataset.b;
-if(a=='nx'&&bs<7){bs++;renderB()}
+if(a=='nx'&&bs<7){bs++;renderB();if(bs==7)createShortLink()}
 else if(a=='bk'&&bs>0){bs--;renderB()}
 else if(a=='st'){const k=t.dataset.k;const A=D.a=='g'?STG:STM;if(k=='m'){sm=(sm+1)%A.length;D.m=sb(A[sm],D)}else D[k]=sb(dflt(k,D),D);const f=$('#f_'+k);f.value=D[k];const c=$('#c_'+k);c.textContent=D[k].length+'/'+MAXL[k];saveD();chk()}
 else if(a=='mode'){const k=t.dataset.k,v=t.dataset.v;v?D[k]='g':delete D[k];saveD();renderB();const nb=$('[data-b="mode"][data-k="'+k+'"][data-v="'+v+'"]');if(nb)nb.focus()}
 else if(a=='clr'){D={};LS.d('tf_boo_draft');renderB()}
 else if(a=='prev'){startP(Object.assign({},D),true)}
 else if(a=='copy')copy($('#lk').value,t,$('#lk'));
-else if(a=='share'){(async()=>{try{await navigator.share({text:'Open this on your phone 🕯️',url:$('#lk').value})}catch(x){}})()}});
+else if(a=='share'){(async()=>{try{await navigator.share({text:'Open this on your phone 🕯️',url:$('#lk').value})}catch(x){}})()}
+else if(a=='retry'){createShortLink()}});
 /* ---------------- BOOT ---------------- */
+const c=location.hash.match(/^#c=([a-z0-9]{8,20})$/i);
 const m=location.hash.match(/^#p=([\w-]+)/);
-if(m){const d=dec(m[1]);if(d&&typeof d.n==='string'&&d.n&&typeof d.f==='string'&&d.f)startP(d,false,m[1]);else{document.title="You've been Boo'd 🕯️";$('#p').hidden=false;$('#p').innerHTML='<main class="sc"><div class="in"><h2>This link looks incomplete.</h2><p class="sub">Part of it may have been cut off. Ask the sender to copy and send the full link again.</p></div></main>'}}
-else{$('#b').hidden=false;renderB()}
+
+if(c){
+ $('#p').hidden=false;
+ $('#p').innerHTML='<main class="sc"><div class="in"><h2>Opening your gift...</h2><p class="sub">Please wait a moment.</p></div></main>';
+ fetch(API+'/api/gifts/'+c[1])
+ .then(r=>{if(!r.ok)throw new Error('Gift unavailable');return r.json()})
+ .then(d=>{
+  if(!d||typeof d.n!=='string'||!d.n||typeof d.f!=='string'||!d.f)throw new Error('Invalid gift');
+  startP(d,false,c[1]);
+ })
+ .catch(()=>{
+  $('#p').innerHTML='<main class="sc"><div class="in"><h2>This gift link is unavailable.</h2><p class="sub">It may have expired. Please ask the sender for a new link.</p></div></main>';
+ });
+}else if(m){
+ const d=dec(m[1]);
+ if(d&&typeof d.n==='string'&&d.n&&typeof d.f==='string'&&d.f)startP(d,false,m[1]);
+ else{
+  document.title="You've been Boo'd 🕯️";
+  $('#p').hidden=false;
+  $('#p').innerHTML='<main class="sc"><div class="in"><h2>This link looks incomplete.</h2><p class="sub">Ask the sender to send the full link again.</p></div></main>';
+ }
+}else{
+ $('#b').hidden=false;
+ renderB();
+}
 })();
 </script>
 </body>
